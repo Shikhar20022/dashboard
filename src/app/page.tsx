@@ -1,113 +1,232 @@
-import Image from 'next/image'
+"use client";
+
+import { useEffect, useState } from "react";
+import { ArrowLeft2, ArrowRight2, BagCross } from "iconsax-react";
+import Search from "@/components/Search";
+import Table from "@/components/Table";
 
 export default function Home() {
+  const [users, setUsers] = useState<any>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
+  const [editRowId, setEditRowId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // const [displayedUsers, setDisplayedUsers] = useState([]);
+
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(
+          "https://geektrust.s3-ap-southeast-1.amazonaws.com/adminui-problem/members.json"
+        );
+        if (!response.ok) {
+          throw new Error("Network response was not ok.");
+        }
+        const data = await response.json();
+        setUsers(data);
+      } catch (error: any) {
+        console.error("Error fetching data:", error.message);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const displayedUsers = users.slice(startIndex, endIndex);
+
+  // useEffect(() => {
+  //   setDisplayedUsers(users.slice(startIndex, endIndex));
+  // }, [startIndex, endIndex]);
+
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePageClick = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handleCheckboxChange = (userId: number) => {
+    const updatedSelectedRows = selectedRows.includes(userId)
+      ? selectedRows.filter((id) => id !== userId)
+      : [...selectedRows, userId];
+    setSelectedRows(updatedSelectedRows);
+  };
+
+  const handleDeleteSelectedRows = () => {
+    const updatedUsers = users.filter(
+      (user: any) => !selectedRows.includes(user.id)
+    );
+    setUsers(updatedUsers);
+    setSelectedRows([]);
+  };
+
+  const handleEditRow = (userId: number) => {
+    setEditRowId(userId);
+  };
+
+  const handleDeleteRow = (userId: number) => {
+    const updatedUsers = users.filter((user: any) => user.id !== userId);
+    setUsers(updatedUsers);
+    setSelectedRows(selectedRows.filter((id) => id !== userId));
+  };
+
+  const handleSelectAllRows = () => {
+    const allRowIds = displayedUsers.map((user: any) => user.id);
+    const updatedSelectedRows =
+      selectedRows.length === allRowIds.length ? [] : allRowIds;
+    setSelectedRows(updatedSelectedRows);
+  };
+
+  const filteredUsers = users.filter((user: any) => {
+    const { name, email, role } = user;
+    const query = searchQuery.toLowerCase();
+    return (
+      name.toLowerCase().includes(query) ||
+      email.toLowerCase().includes(query) ||
+      role.toLowerCase().includes(query)
+    );
+  });
+
+  // Function to handle search value change
+  const handleSearch = (searchValue: string) => {
+    // Update search query in lowercase
+    setSearchQuery(searchValue.toLowerCase());
+  };
+
+  // Function to clear search
+  const clearSearch = () => {
+    setSearchQuery("");
+  };
+
+  const handleSaveChanges = (updatedUsers: any) => {
+    // Assuming editRowId is the ID of the object you want to remove
+    const filteredUsers = users.filter((user: any) => user.id !== editRowId);
+    setUsers([...updatedUsers, ...filteredUsers]);
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <>
+      <div className="flex flex-row items-center justify-between">
+        <Search onSearch={handleSearch} onClearSearch={clearSearch} />
+        <button
+          onClick={handleDeleteSelectedRows}
+          className="p-2 bg-red-400 rounded-md"
+        >
+          <BagCross size="16" color="white" />
+        </button>
+      </div>
+
+      <Table
+        users={searchQuery ? filteredUsers : displayedUsers}
+        selectedRows={selectedRows}
+        editRowId={editRowId}
+        onCheckboxChange={handleCheckboxChange}
+        onDeleteSelectedRows={handleDeleteSelectedRows}
+        onEditRow={handleEditRow}
+        onDeleteRow={handleDeleteRow}
+        onSelectAllRows={handleSelectAllRows}
+        onSaveChanges={handleSaveChanges}
+      />
+
+      {/* pagination  */}
+      {!searchQuery && (
+        <div className="flex flex-row items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-600 font-medium">
+              {selectedRows.length} of {users.length} row(s) selected
+            </p>
+          </div>
+
+          <div className="flex flex-row items-center gap-6">
+            <p className="text-xs text-gray-600 font-medium">
+              page 1 of {totalPages}
+            </p>
+
+            <div className="flex flex-row items-center gap-1">
+              {/* Previous page button */}
+              <button
+                className="p-2 border-2 rounded-md relative"
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+              >
+                <ArrowLeft2
+                  size="12"
+                  color={currentPage === 1 ? "gray" : "black"}
+                />
+                <ArrowLeft2
+                  size="12"
+                  color={currentPage === 1 ? "gray" : "black"}
+                  className="absolute top-2 right-0 left-1"
+                />
+              </button>
+              {/* Previous page button */}
+              <button
+                className="p-2 border-2 rounded-md"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ArrowLeft2
+                  size="12"
+                  color={currentPage === 1 ? "gray" : "black"}
+                />
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex items-center">
+                {Array.from(
+                  { length: totalPages },
+                  (_, index) => index + 1
+                ).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => handlePageClick(page)}
+                    className={` aspect-square w-8 border-2 rounded-md mx-1 cursor-pointer text-xs font-semibold ${
+                      currentPage === page ? "bg-gray-300" : ""
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+
+              {/* Next page button */}
+              <button
+                className="p-2 border-2 rounded-md"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                <ArrowRight2
+                  size="12"
+                  color={currentPage === totalPages ? "gray" : "black"}
+                />
+              </button>
+              {/* Next page button */}
+              <button
+                className="p-2 border-2 rounded-md relative"
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages}
+              >
+                <ArrowRight2
+                  size="12"
+                  color={currentPage === totalPages ? "gray" : "black"}
+                />
+                <ArrowRight2
+                  size="12"
+                  color={currentPage === totalPages ? "gray" : "black"}
+                  className="absolute left-1 top-2 bottom-0 right-0"
+                />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+      )}
+    </>
+  );
 }
